@@ -13,7 +13,21 @@ const { streamFile } = require('./services/driveService');
 
 const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+const allowedOrigins = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.length === 0) return cb(null, true);
+    const allowed =
+      allowedOrigins.some(o => o === origin) ||
+      origin.endsWith('.vercel.app');
+    cb(allowed ? null : new Error('CORS: origin not allowed'), allowed);
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // Stream wedding photos directly from Google Drive — no local disk needed
@@ -48,7 +62,7 @@ mongoose
       console.log(`Server running on http://localhost:${process.env.PORT}`)
     );
   })
-  .catch((err) => {
+  .catch((aerr) => {
     console.error('Startup error:', err.message);
     process.exit(1);
   });
