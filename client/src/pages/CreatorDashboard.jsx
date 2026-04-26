@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCreator } from '../context/CreatorContext';
-import { getCreatorMe, triggerSync, updateDriveFolder, processFaces } from '../api/creator';
+import { getCreatorMe, triggerSync, updateDriveFolder, processFaces, rematchGuests } from '../api/creator';
 
 export default function CreatorDashboard() {
   const { creator, login: refreshCreator, logout } = useCreator();
@@ -10,6 +10,7 @@ export default function CreatorDashboard() {
   const [serviceEmail, setServiceEmail] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [rematching, setRematching] = useState(false);
   const [processProgress, setProcessProgress] = useState(null); // { total, remaining }
   const [syncResult, setSyncResult] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -81,6 +82,18 @@ export default function CreatorDashboard() {
       setProcessProgress(null);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleRematch = async () => {
+    setRematching(true);
+    try {
+      const { data } = await rematchGuests();
+      toast.success(`Rematch done: ${data.guests} guests, ${data.totalMatches} total photo matches.`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Rematch failed');
+    } finally {
+      setRematching(false);
     }
   };
 
@@ -176,9 +189,17 @@ export default function CreatorDashboard() {
               className="auth-card__submit"
               style={{ maxWidth: '220px', background: processing ? '#888' : '#6b46c1' }}
               onClick={handleProcessFaces}
-              disabled={processing || syncing}
+              disabled={processing || syncing || rematching}
             >
               {processing ? 'Processing...' : 'Process Faces'}
+            </button>
+            <button
+              className="auth-card__submit"
+              style={{ maxWidth: '220px', background: rematching ? '#888' : '#2563eb' }}
+              onClick={handleRematch}
+              disabled={processing || syncing || rematching}
+            >
+              {rematching ? 'Rematching...' : 'Rematch Guests'}
             </button>
           </div>
 

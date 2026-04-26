@@ -14,3 +14,4 @@ export const getCreatorMe = () => API.get('/me');
 export const updateDriveFolder = (driveFolderUrl) => API.patch('/folder', { driveFolderUrl });
 export const triggerSync = () => API.post('/sync');
 export const processFaces = () => API.post('/process-faces');
+export const rematchGuests = () => API.post('/rematch');

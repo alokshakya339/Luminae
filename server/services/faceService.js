@@ -57,7 +57,7 @@ function euclideanDistance(d1, d2) {
   );
 }
 
-function isFaceMatch(descriptor1, descriptor2, threshold = 0.5) {
+function isFaceMatch(descriptor1, descriptor2, threshold = 0.6) {
   return euclideanDistance(descriptor1, descriptor2) < threshold;
 }
 

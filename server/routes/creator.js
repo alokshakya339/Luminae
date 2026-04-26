@@ -246,4 +246,34 @@ router.post('/process-faces', creatorAuth, async (req, res) => {
   }
 });
 
+// POST /api/creator/rematch — re-run face matching for all guests against all processed photos
+router.post('/rematch', creatorAuth, async (req, res) => {
+  try {
+    const guests = await Guest.find({ creatorId: req.creatorId });
+    const photos = await WeddingPhoto.find({ creatorId: req.creatorId, faceCount: { $gt: 0 } });
+
+    let totalMatches = 0;
+    for (const guest of guests) {
+      const matched = [];
+      for (const photo of photos) {
+        for (const faceDesc of photo.faceDescriptors) {
+          if (isFaceMatch(guest.faceDescriptor, faceDesc)) {
+            matched.push(photo._id);
+            break;
+          }
+        }
+      }
+      guest.matchedPhotoIds = matched;
+      await guest.save();
+      totalMatches += matched.length;
+      console.log(`Rematch: ${guest.name} — ${matched.length} photos`);
+    }
+
+    res.json({ guests: guests.length, totalMatches });
+  } catch (err) {
+    console.error('Rematch error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
