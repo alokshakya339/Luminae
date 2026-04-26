@@ -169,19 +169,22 @@ router.post('/sync', creatorAuth, async (req, res) => {
     let added = 0, skipped = 0;
 
     for (const file of files) {
-      const existing = await WeddingPhoto.findOne({ driveFileId: file.id, creatorId: creator._id });
-      if (existing) { skipped++; continue; }
-
       const ext = path.extname(file.name) || '.jpg';
-      await WeddingPhoto.create({
-        creatorId: creator._id,
-        driveFileId: file.id,
-        originalName: file.name,
-        localFilename: `photo_${file.id}${ext}`,
-        faceDescriptors: [],
-        faceCount: 0,
-      });
-      added++;
+      const result = await WeddingPhoto.updateOne(
+        { driveFileId: file.id },
+        { $setOnInsert: {
+          creatorId: creator._id,
+          driveFileId: file.id,
+          originalName: file.name,
+          localFilename: `photo_${file.id}${ext}`,
+          faceDescriptors: [],
+          faceCount: 0,
+          faceProcessed: false,
+        }},
+        { upsert: true }
+      );
+      if (result.upsertedCount) added++;
+      else skipped++;
     }
 
     console.log(`Sync done: ${added} new, ${skipped} skipped`);
