@@ -20,6 +20,15 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
+function uploadSelfie(req, res, next) {
+  uploadSelfie(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE')
+      return res.status(400).json({ error: 'Image too large. Please upload a photo under 5 MB.' });
+    res.status(400).json({ error: err.message });
+  });
+}
+
 // Write buffer to a temp file, run fn(tmpPath), then delete the temp file
 async function withTempFile(buffer, originalname, fn) {
   const ext = path.extname(originalname) || '.jpg';
@@ -52,7 +61,7 @@ async function findMatchedPhotos(descriptor, creatorId) {
 }
 
 // POST /api/auth/signup
-router.post('/signup', upload.single('selfie'), async (req, res) => {
+router.post('/signup', uploadSelfie, async (req, res) => {
   try {
     const { name, email, albumCode } = req.body;
     if (!name || !email || !albumCode) return res.status(400).json({ error: 'Name, email, and album code are required' });
@@ -92,7 +101,7 @@ router.post('/signup', upload.single('selfie'), async (req, res) => {
 });
 
 // POST /api/auth/login  — verify identity by face
-router.post('/login', upload.single('selfie'), async (req, res) => {
+router.post('/login', uploadSelfie, async (req, res) => {
   try {
     const { email, albumCode } = req.body;
     if (!email || !albumCode) return res.status(400).json({ error: 'Email and album code are required' });
