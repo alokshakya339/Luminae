@@ -11,7 +11,7 @@ export default function GalleryPage() {
 
   useEffect(() => {
     getMyPhotos()
-      .then(({ data }) => setPhotos(data.photos))
+      .then(({ data }) => setPhotos(data?.photos ?? []))
       .catch(() => toast.error('Failed to load your photos'))
       .finally(() => setLoading(false));
   }, []);
@@ -23,7 +23,7 @@ export default function GalleryPage() {
         <p>These are all the moments captured with you in them</p>
         {!loading && (
           <div className="gallery-hero__badge">
-            {photos.length} photo{photos.length !== 1 ? 's' : ''} found
+            {photos?.length} photo{photos?.length !== 1 ? 's' : ''} found
           </div>
         )}
       </div>

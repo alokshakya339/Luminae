@@ -63,7 +63,7 @@ mongoose
       console.log(`Server running on http://localhost:${process.env.PORT}`)
     );
   })
-  .catch((aerr) => {
+  .catch((err) => {
     console.error('Startup error:', err.message);
     process.exit(1);
   });

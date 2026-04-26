@@ -171,7 +171,7 @@ router.post('/sync', creatorAuth, async (req, res) => {
     for (const file of files) {
       const ext = path.extname(file.name) || '.jpg';
       const result = await WeddingPhoto.updateOne(
-        { driveFileId: file.id },
+        { driveFileId: file.id, creatorId: creator._id },
         { $setOnInsert: {
           creatorId: creator._id,
           driveFileId: file.id,
@@ -191,6 +191,21 @@ router.post('/sync', creatorAuth, async (req, res) => {
     res.json({ message: 'Sync complete', total: files.length, added, skipped });
   } catch (err) {
     console.error('Sync error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/creator/reset-faces — reset all photos to unprocessed so they can be re-run
+router.post('/reset-faces', creatorAuth, async (req, res) => {
+  try {
+    const result = await WeddingPhoto.updateMany(
+      { creatorId: req.creatorId },
+      { $set: { faceDescriptors: [], faceCount: 0, faceProcessed: false } }
+    );
+    await Guest.updateMany({ creatorId: req.creatorId }, { $set: { matchedPhotoIds: [] } });
+    console.log(`Reset ${result.modifiedCount} photos for reprocessing`);
+    res.json({ reset: result.modifiedCount });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

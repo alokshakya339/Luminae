@@ -44,10 +44,7 @@ async function extractAllDescriptors(imagePath) {
     .detectAllFaces(img)
     .withFaceLandmarks()
     .withFaceDescriptors();
-  const result = detections.map((d) => Array.from(d.descriptor));
-  tf.dispose(detections);
-  tf.engine().endScope();
-  return result;
+  return detections.map((d) => Array.from(d.descriptor));
 }
 
 // Euclidean distance between two 128-dim descriptors
