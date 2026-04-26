@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { getMyPhotos } from '../api/index';
 import PhotoCard from '../components/PhotoCard';
 import Lightbox from '../components/Lightbox';
 import toast from 'react-hot-toast';
 
 export default function GalleryPage() {
-  const { guest } = useAuth();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState(null);

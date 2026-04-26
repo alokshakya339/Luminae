@@ -15,6 +15,7 @@ export default function PhotoCard({ photo, onOpen }) {
       />
       <div className="photo-card__footer">
         <span>{photo.originalName}</span>
+        <span>{date}</span>
         <a
           href={`${BASE}/${photo.localFilename}`}
           download={photo.originalName}
