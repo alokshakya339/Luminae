@@ -2,6 +2,9 @@
   "name": "wedding-photo-server",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "NODE_OPTIONS=--openssl-legacy-provider node index.js",
     "dev": "NODE_OPTIONS=--openssl-legacy-provider nodemon index.js"
