@@ -276,4 +276,25 @@ router.post('/rematch', creatorAuth, async (req, res) => {
   }
 });
 
+// GET /api/creator/stats — diagnostic info about processing state
+router.get('/stats', creatorAuth, async (req, res) => {
+  try {
+    const total = await WeddingPhoto.countDocuments({ creatorId: req.creatorId });
+    const processed = await WeddingPhoto.countDocuments({ creatorId: req.creatorId, faceProcessed: true });
+    const withFaces = await WeddingPhoto.countDocuments({ creatorId: req.creatorId, faceCount: { $gt: 0 } });
+    const guests = await Guest.find({ creatorId: req.creatorId }).select('name email matchedPhotoIds faceDescriptor');
+
+    const guestInfo = guests.map(g => ({
+      name: g.name,
+      email: g.email,
+      matchedCount: g.matchedPhotoIds.length,
+      hasFaceDescriptor: g.faceDescriptor?.length > 0,
+    }));
+
+    res.json({ total, processed, withFaces, unprocessed: total - processed, guests: guestInfo });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
