@@ -185,7 +185,7 @@ router.post('/sync', creatorAuth, async (req, res) => {
 
           await downloadFile(file.id, tmpPath);
           const descriptors = await extractAllDescriptors(tmpPath);
-          fs.promises.unlink(tmpPath).catch(() => {});
+          await fs.promises.unlink(tmpPath).catch(() => {});
 
           const photo = await WeddingPhoto.create({
             creatorId: creator._id,
@@ -213,6 +213,9 @@ router.post('/sync', creatorAuth, async (req, res) => {
 
           processed++;
           console.log(`[${processed + skipped}/${files.length}] ${file.name} — ${descriptors.length} face(s)`);
+
+          // pause every 10 photos to let GC free memory
+          if (processed % 10 === 0) await new Promise(r => setTimeout(r, 1000));
         } catch (fileErr) {
           console.error(`Failed on ${file.name}:`, fileErr.message);
         }
