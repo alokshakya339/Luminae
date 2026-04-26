@@ -223,7 +223,7 @@ router.post('/process-faces', creatorAuth, async (req, res) => {
       for (const guest of guests) {
         for (const faceDesc of descriptors) {
           if (isFaceMatch(guest.faceDescriptor, faceDesc)) {
-            if (!guest.matchedPhotoIds.includes(photo._id)) {
+            if (!guest.matchedPhotoIds.some(id => id.equals(photo._id))) {
               guest.matchedPhotoIds.push(photo._id);
               await guest.save();
             }
