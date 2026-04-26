@@ -12,9 +12,15 @@ router.get('/my', authMiddleware, async (req, res) => {
     const guest = await Guest.findById(req.guestId).populate('matchedPhotoIds');
     if (!guest) return res.status(404).json({ error: 'Guest not found' });
 
-    // if no matches yet, re-run face matching against all processed photos
-    if (guest.matchedPhotoIds.length === 0 && guest.faceDescriptor?.length > 0) {
+    // filter out nulls from stale ObjectIds
+    const validPhotos = guest.matchedPhotoIds.filter(Boolean);
+
+    console.log(`Guest ${guest.email}: storedIds=${guest.matchedPhotoIds.length}, validPhotos=${validPhotos.length}, creatorId=${guest.creatorId}`);
+
+    // re-run face matching if no valid photos found
+    if (validPhotos.length === 0 && guest.faceDescriptor?.length > 0) {
       const photos = await WeddingPhoto.find({ creatorId: guest.creatorId, faceCount: { $gt: 0 } });
+      console.log(`Rematch: found ${photos.length} processed photos for creatorId=${guest.creatorId}`);
       const matched = [];
       for (const photo of photos) {
         for (const faceDesc of photo.faceDescriptors) {
@@ -24,16 +30,19 @@ router.get('/my', authMiddleware, async (req, res) => {
           }
         }
       }
-      if (matched.length > 0) {
-        guest.matchedPhotoIds = matched;
-        await guest.save();
-        await guest.populate('matchedPhotoIds');
-      }
+      console.log(`Rematch result: ${matched.length} matches`);
+      guest.matchedPhotoIds = matched;
+      await guest.save();
+      await guest.populate('matchedPhotoIds');
+      return res.json({
+        guest: { name: guest.name, email: guest.email },
+        photos: guest.matchedPhotoIds.filter(Boolean),
+      });
     }
 
     res.json({
       guest: { name: guest.name, email: guest.email },
-      photos: guest.matchedPhotoIds,
+      photos: validPhotos,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

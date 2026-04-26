@@ -13,16 +13,21 @@ function getAuth() {
   });
 }
 
-// Stream a Drive file directly to a response (no local disk needed)
-async function streamFile(fileId) {
+// Fetch a Drive file as a buffer
+async function fetchFileBuffer(fileId) {
   const auth = getAuth();
   const drive = google.drive({ version: 'v3', auth });
-  const meta = await drive.files.get({ fileId, fields: 'mimeType' });
-  const res = await drive.files.get(
-    { fileId, alt: 'media' },
-    { responseType: 'stream' }
-  );
-  return { stream: res.data, mimeType: meta.data.mimeType || 'image/jpeg' };
+  const [meta, file] = await Promise.all([
+    drive.files.get({ fileId, fields: 'mimeType' }),
+    drive.files.get(
+      { fileId, alt: 'media', acknowledgeAbuse: true },
+      { responseType: 'arraybuffer' }
+    ),
+  ]);
+  return {
+    buffer: Buffer.from(file.data),
+    mimeType: meta.data.mimeType || 'image/jpeg',
+  };
 }
 
 // List all image files inside a Drive folder
@@ -47,4 +52,4 @@ async function downloadFile(fileId, destPath) {
   await streamPipeline(res.data, writer);
 }
 
-module.exports = { listPhotosInFolder, downloadFile, streamFile };
+module.exports = { listPhotosInFolder, downloadFile, fetchFileBuffer };

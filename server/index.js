@@ -9,7 +9,7 @@ const photoRoutes = require('./routes/photos');
 const adminRoutes = require('./routes/admin');
 const creatorRoutes = require('./routes/creator');
 const { loadModels } = require('./services/faceService');
-const { streamFile } = require('./services/driveService');
+const { fetchFileBuffer } = require('./services/driveService');
 
 const app = express();
 
@@ -32,15 +32,16 @@ app.use(express.json());
 
 // Stream wedding photos directly from Google Drive — no local disk needed
 app.get('/photos/:filename', async (req, res) => {
-  // filename format written by admin sync: photo_<driveFileId>.ext
   const match = req.params.filename.match(/^photo_(.+)\.[^.]+$/);
   if (!match) return res.status(404).json({ error: 'Not found' });
   try {
-    const { stream, mimeType } = await streamFile(match[1]);
+    const { buffer, mimeType } = await fetchFileBuffer(match[1]);
     res.setHeader('Content-Type', mimeType);
-    stream.pipe(res);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(buffer);
   } catch (err) {
-    console.error('Photo stream error:', err.message);
+    console.error('Photo fetch error:', err.message);
     res.status(500).json({ error: 'Failed to fetch photo' });
   }
 });
