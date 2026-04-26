@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useCreator } from '../context/CreatorContext';
-import { getCreatorMe, triggerSync, updateDriveFolder } from '../api/creator';
+import { getCreatorMe, triggerSync, updateDriveFolder, processFaces } from '../api/creator';
 
 export default function CreatorDashboard() {
   const { creator, login: refreshCreator, logout } = useCreator();
   const [stats, setStats] = useState(null);
   const [serviceEmail, setServiceEmail] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [processProgress, setProcessProgress] = useState(null); // { total, remaining }
+  const [syncResult, setSyncResult] = useState(null);
   const [copied, setCopied] = useState(false);
   const [newFolderUrl, setNewFolderUrl] = useState('');
   const [updatingFolder, setUpdatingFolder] = useState(false);
@@ -38,13 +41,46 @@ export default function CreatorDashboard() {
 
   const handleSync = async () => {
     setSyncing(true);
+    setSyncResult(null);
     try {
-      await triggerSync();
-      toast.success('Sync started! This may take a few minutes. Refresh stats after it completes.');
+      const { data } = await triggerSync();
+      setSyncResult(data);
+      toast.success(`Sync complete: ${data.added} new photos added.`);
+      setStats(s => s ? { ...s, photoCount: s.photoCount + data.added } : s);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Sync failed');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleProcessFaces = async () => {
+    setProcessing(true);
+    setProcessProgress(null);
+    try {
+      // get initial count
+      const first = await processFaces();
+      if (first.data.done) {
+        toast.success('All faces already processed!');
+        setProcessing(false);
+        return;
+      }
+      const total = first.data.remaining + 1;
+      setProcessProgress({ total, remaining: first.data.remaining });
+
+      let done = false;
+      while (!done) {
+        const { data } = await processFaces();
+        done = data.done;
+        if (!done) setProcessProgress({ total, remaining: data.remaining });
+      }
+      toast.success('All faces processed!');
+      setProcessProgress(null);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Face processing failed');
+      setProcessProgress(null);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -127,14 +163,64 @@ export default function CreatorDashboard() {
               <strong> {serviceEmail}</strong>
             </div>
           )}
-          <button
-            className="auth-card__submit"
-            style={{ marginTop: '16px', maxWidth: '220px' }}
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            {syncing ? 'Starting sync...' : 'Sync Now'}
-          </button>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
+            <button
+              className="auth-card__submit"
+              style={{ maxWidth: '220px' }}
+              onClick={handleSync}
+              disabled={syncing || processing}
+            >
+              {syncing ? 'Syncing...' : 'Sync Photos'}
+            </button>
+            <button
+              className="auth-card__submit"
+              style={{ maxWidth: '220px', background: processing ? '#888' : '#6b46c1' }}
+              onClick={handleProcessFaces}
+              disabled={processing || syncing}
+            >
+              {processing ? 'Processing...' : 'Process Faces'}
+            </button>
+          </div>
+
+          {/* Sync loader */}
+          {syncing && (
+            <div style={{ marginTop: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#888', fontSize: '0.9rem' }}>
+                <div className="spinner" style={{ width: '16px', height: '16px' }} />
+                Fetching photos from Google Drive...
+              </div>
+            </div>
+          )}
+
+          {/* Sync result */}
+          {syncResult && !syncing && (
+            <div style={{ marginTop: '14px', fontSize: '0.9rem', color: '#555' }}>
+              Found <strong>{syncResult.total}</strong> photos —{' '}
+              <strong>{syncResult.added}</strong> new, <strong>{syncResult.skipped}</strong> already synced.
+            </div>
+          )}
+
+          {/* Face processing progress bar */}
+          {processing && processProgress && (
+            <div style={{ marginTop: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#555', marginBottom: '6px' }}>
+                <span>Processing faces...</span>
+                <span>{processProgress.total - processProgress.remaining} / {processProgress.total}</span>
+              </div>
+              <div style={{ background: '#e5e7eb', borderRadius: '999px', height: '8px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  borderRadius: '999px',
+                  background: '#6b46c1',
+                  width: `${((processProgress.total - processProgress.remaining) / processProgress.total) * 100}%`,
+                  transition: 'width 0.3s ease',
+                }} />
+              </div>
+              <p style={{ marginTop: '6px', fontSize: '0.8rem', color: '#888' }}>
+                Keep this tab open. Processing one photo at a time.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* Update folder */}

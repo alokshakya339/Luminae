@@ -1,5 +1,5 @@
 // Must be required first so tfjs-node backend is registered before face-api loads
-require('@tensorflow/tfjs-node');
+const tf = require('@tensorflow/tfjs-node');
 
 const faceapi = require('@vladmandic/face-api');
 const canvas = require('canvas');
@@ -44,7 +44,10 @@ async function extractAllDescriptors(imagePath) {
     .detectAllFaces(img)
     .withFaceLandmarks()
     .withFaceDescriptors();
-  return detections.map((d) => Array.from(d.descriptor));
+  const result = detections.map((d) => Array.from(d.descriptor));
+  tf.dispose(detections);
+  tf.engine().endScope();
+  return result;
 }
 
 // Euclidean distance between two 128-dim descriptors

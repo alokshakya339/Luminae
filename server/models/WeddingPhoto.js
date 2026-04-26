@@ -9,6 +9,7 @@ const weddingPhotoSchema = new mongoose.Schema(
     // Each element is one face's 128-dim descriptor
     faceDescriptors: { type: [[Number]], default: [] },
     faceCount: { type: Number, default: 0 },
+    faceProcessed: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

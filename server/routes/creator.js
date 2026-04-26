@@ -159,72 +159,87 @@ router.get('/photos', creatorAuth, async (req, res) => {
   }
 });
 
-// POST /api/creator/sync — pull photos from Drive, extract faces, match guests
+// POST /api/creator/sync — pull photo metadata from Drive (no face processing)
 router.post('/sync', creatorAuth, async (req, res) => {
   try {
     const creator = await Creator.findById(req.creatorId);
     if (!creator) return res.status(404).json({ error: 'Creator not found' });
 
-    res.json({ message: 'Sync started. Check server logs for progress.' });
+    const files = await listPhotosInFolder(creator.driveFolderId);
+    let added = 0, skipped = 0;
 
-    (async () => {
-      console.log(`\n=== Sync started for: ${creator.name} (${creator.albumCode}) ===`);
-      const files = await listPhotosInFolder(creator.driveFolderId);
-      console.log(`Found ${files.length} photos in Drive folder`);
+    for (const file of files) {
+      const existing = await WeddingPhoto.findOne({ driveFileId: file.id, creatorId: creator._id });
+      if (existing) { skipped++; continue; }
 
-      let processed = 0, skipped = 0;
+      const ext = path.extname(file.name) || '.jpg';
+      await WeddingPhoto.create({
+        creatorId: creator._id,
+        driveFileId: file.id,
+        originalName: file.name,
+        localFilename: `photo_${file.id}${ext}`,
+        faceDescriptors: [],
+        faceCount: 0,
+      });
+      added++;
+    }
 
-      for (const file of files) {
-        try {
-          const existing = await WeddingPhoto.findOne({ driveFileId: file.id, creatorId: creator._id });
-          if (existing) { skipped++; continue; }
-
-          const ext = path.extname(file.name) || '.jpg';
-          const localFilename = `photo_${file.id}${ext}`;
-          const tmpPath = path.join(os.tmpdir(), localFilename);
-
-          await downloadFile(file.id, tmpPath);
-          const descriptors = await extractAllDescriptors(tmpPath);
-          await fs.promises.unlink(tmpPath).catch(() => {});
-
-          const photo = await WeddingPhoto.create({
-            creatorId: creator._id,
-            driveFileId: file.id,
-            originalName: file.name,
-            localFilename,
-            faceDescriptors: descriptors,
-            faceCount: descriptors.length,
-          });
-
-          if (descriptors.length > 0) {
-            const guests = await Guest.find({ creatorId: creator._id });
-            for (const guest of guests) {
-              for (const faceDesc of descriptors) {
-                if (isFaceMatch(guest.faceDescriptor, faceDesc)) {
-                  if (!guest.matchedPhotoIds.includes(photo._id)) {
-                    guest.matchedPhotoIds.push(photo._id);
-                    await guest.save();
-                  }
-                  break;
-                }
-              }
-            }
-          }
-
-          processed++;
-          console.log(`[${processed + skipped}/${files.length}] ${file.name} — ${descriptors.length} face(s)`);
-
-          // pause every 10 photos to let GC free memory
-          if (processed % 10 === 0) await new Promise(r => setTimeout(r, 1000));
-        } catch (fileErr) {
-          console.error(`Failed on ${file.name}:`, fileErr.message);
-        }
-      }
-
-      console.log(`=== Sync complete: ${processed} new, ${skipped} skipped ===`);
-    })();
+    console.log(`Sync done: ${added} new, ${skipped} skipped`);
+    res.json({ message: 'Sync complete', total: files.length, added, skipped });
   } catch (err) {
     console.error('Sync error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/creator/process-faces — process one unprocessed photo at a time
+router.post('/process-faces', creatorAuth, async (req, res) => {
+  try {
+    const photo = await WeddingPhoto.findOne({
+      creatorId: req.creatorId,
+      faceDescriptors: { $size: 0 },
+      faceProcessed: { $ne: true },
+    });
+
+    if (!photo) return res.json({ done: true, message: 'All photos processed' });
+
+    const ext = path.extname(photo.originalName) || '.jpg';
+    const tmpPath = path.join(os.tmpdir(), `photo_${photo.driveFileId}${ext}`);
+
+    await downloadFile(photo.driveFileId, tmpPath);
+    const descriptors = await extractAllDescriptors(tmpPath);
+    await fs.promises.unlink(tmpPath).catch(() => {});
+
+    photo.faceDescriptors = descriptors;
+    photo.faceCount = descriptors.length;
+    photo.faceProcessed = true;
+    await photo.save();
+
+    if (descriptors.length > 0) {
+      const guests = await Guest.find({ creatorId: req.creatorId });
+      for (const guest of guests) {
+        for (const faceDesc of descriptors) {
+          if (isFaceMatch(guest.faceDescriptor, faceDesc)) {
+            if (!guest.matchedPhotoIds.includes(photo._id)) {
+              guest.matchedPhotoIds.push(photo._id);
+              await guest.save();
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    const remaining = await WeddingPhoto.countDocuments({
+      creatorId: req.creatorId,
+      faceProcessed: { $ne: true },
+    });
+
+    console.log(`Processed: ${photo.originalName} — ${descriptors.length} face(s), ${remaining} remaining`);
+    res.json({ done: false, processed: photo.originalName, faces: descriptors.length, remaining });
+  } catch (err) {
+    console.error('Process-faces error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
