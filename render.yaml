@@ -1,10 +1,9 @@
 services:
   - type: web
     name: wedding-photo-server
-    env: node
-    rootDir: server
-    buildCommand: npm ci
-    startCommand: npm start
+    env: docker
+    dockerfilePath: server/Dockerfile
+    dockerContext: server
     envVars:
       - key: PORT
         value: 10000
