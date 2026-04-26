@@ -3,7 +3,7 @@ services:
     name: wedding-photo-server
     env: node
     rootDir: server
-    buildCommand: npm install && npm rebuild canvas --build-from-source
+    buildCommand: npm ci
     startCommand: npm start
     envVars:
       - key: PORT
