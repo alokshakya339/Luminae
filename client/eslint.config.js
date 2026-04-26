@@ -15,6 +15,8 @@ export default defineConfig([
     ],
     rules: {
       'react-refresh/only-export-components': 'warn',
+      'react/no-unescaped-entities': 'off',
+      'react/react-in-jsx-scope': 'off',
     },
     languageOptions: {
       globals: globals.browser,
